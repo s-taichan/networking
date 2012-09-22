@@ -1,18 +1,19 @@
-package sample;
+package multipleClientChat;
 
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+
 public class ChatServer {
 	String host = "localhost";
 	int port = 8000;
 
-	ChatPanel chatPanel = new ChatPanel("サーバー側のチャット画面");
+	ServerLogPanel chatPanel = new ServerLogPanel();
 
 	public static void main(String[] args) {
 		ServerSocket serverSocket = null;
@@ -29,7 +30,7 @@ public class ChatServer {
 			while (true) {
 				// acceptメソッドを呼び出し、クライアントからの接続待機状態に入る
 				Socket socket = serverSocket.accept();
-				System.out.println("接続: " + socket.getRemoteSocketAddress() );
+				applet.chatPanel.jtfChatNote.append("新たな接続: " + socket.getRemoteSocketAddress() + "\n" );
 
 				// 新しくスレッドを作成する
 				HandleChatClients task = new HandleChatClients(socket, applet);
@@ -42,7 +43,7 @@ public class ChatServer {
 		}
 	}
 }
-class HandleChatClients implements Runnable {
+class HandleChatClients implements Runnable, DocumentListener {
 	private Socket socket;
 	private ChatServer applet;
 	private ObjectInputStream fromClient;
@@ -52,8 +53,8 @@ class HandleChatClients implements Runnable {
 		this.socket = socket;
 		this.applet = applet;
 
-		// Submitボタンを押したときの処理
-		applet.chatPanel.chatHundleButton.addActionListener(new ButtonListener());
+		// JTextAriaの更新でイベントを呼び出し
+		applet.chatPanel.jtfChatNote.getDocument().addDocumentListener(this);
 	}
 
 	public void run() {
@@ -62,11 +63,11 @@ class HandleChatClients implements Runnable {
 				// ソケットに対して入力するためのReaderを作成
 				fromClient = new ObjectInputStream(socket.getInputStream());
 
-				// クライアントが送信したAddressオブジェクトを取得
+				// クライアントが送信したChatオブジェクトを取得
 				Chat chatObj = (Chat) fromClient.readObject();
 				System.out.println("Nameから送信されました : " + chatObj.getName());
 
-				// Addressオブジェクトからユーザー名とアドレスの情報を取得して、テキストエリアに書き込み
+				// Chatオブジェクトからユーザー名とチャットの情報を取得して、テキストエリアに書き込み
 				applet.chatPanel.jtfChatNote.append(chatObj.getName() + " ＞ " + chatObj.getChat() + "\n");
 			}
 		} catch (ClassNotFoundException e) {
@@ -76,28 +77,36 @@ class HandleChatClients implements Runnable {
 		}
 	}
 
-	// Submitボタンを押したときの処理
-	class ButtonListener implements ActionListener {
-		@Override
-		public void actionPerformed(ActionEvent e) {
-			try {
-				// ソケットに出力するためのReaderを作成
-				ObjectOutputStream toClient = new ObjectOutputStream(socket.getOutputStream());
 
-				// テキストフィールドの値を取得する
-				String name = applet.chatPanel.jtfName.getText().trim();
-				String tweet =applet.chatPanel.jtfTweet.getText().trim();
+	@Override
+	public void insertUpdate(DocumentEvent e) {
+		// TODO 自動生成されたメソッド・スタブ
+		try {
+			// ソケットに出力するためのReaderを作成
+			ObjectOutputStream toClient = new ObjectOutputStream(socket.getOutputStream());
 
-				// Addressオブジェクトをサーバに送信
-				Chat chatObj = new Chat(name, tweet);
-				toClient.writeObject(chatObj);
+			String str = applet.chatPanel.jtfChatNote.getText();
+			String[] strs = str.split("\n");
+			String lastLines = strs[applet.chatPanel.jtfChatNote.getLineCount() - 2];
 
-				// textareaに取得した値を書き込み
-				applet.chatPanel.jtfChatNote.append(tweet + "\n");
-			} catch (IOException ex) {
-				System.err.println(ex);
-			}
+			// Chatオブジェクトをサーバに送信
+			Chat chatObj = new Chat(lastLines);
+			toClient.writeObject(chatObj);
+
+		} catch (IOException ex) {
+			System.err.println(ex);
 		}
+	}
+
+	@Override
+	public void removeUpdate(DocumentEvent e) {
+		// TODO 自動生成されたメソッド・スタブ
+
+	}
+
+	@Override
+	public void changedUpdate(DocumentEvent e) {
+		// TODO 自動生成されたメソッド・スタブ
 
 	}
 }
